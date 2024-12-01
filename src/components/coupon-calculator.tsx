@@ -10,155 +10,45 @@ export const CouponCalculator = () => {
   const [originalPrice, setOriginalPrice] = useState('');
   const [quantity, setQuantity] = useState('');
   const [isPlusMember, setIsPlusMember] = useState(false);
-  const [discountEnabled, setDiscountEnabled] = useState(false);
-  const [discountRule, setDiscountRule] = useState({
-    quantity: '',
-    discount: ''
-  });
-  const [reductionEnabled, setReductionEnabled] = useState(false);
-  const [reductionRule, setReductionRule] = useState({
-    quantity: '',
-    reduction: ''
-  });
   const [coupons, setCoupons] = useState([
-    { threshold: '', discount: '', ratio: '0' },
-    { threshold: '', discount: '', ratio: '0' }
+    { type: '满减', condition: '', amount: '' },
+    { type: '满减', condition: '', amount: '' }
   ]);
 
-  const calculateCouponRatio = useCallback((threshold) => {
-    const totalPrice = calculateTotalOriginalPrice();
-    if (!threshold || threshold <= 0) return '0';
-    
-    if (totalPrice >= threshold) {
-      return '1.0000';
-    } else {
-      return (totalPrice / threshold).toFixed(4);
+  const calculateFinalPrice = useCallback(() => {
+    let finalPrice = Number(originalPrice) || 0;
+    if (isPlusMember) {
+      finalPrice *= 0.95; // Plus会员95折
     }
-  }, [calculateTotalOriginalPrice]);
+    finalPrice = calculateTotalPrice(finalPrice);
+    return finalPrice;
+  }, [originalPrice, isPlusMember, coupons]);
 
-  const updateAllCouponRatios = useCallback(() => {
-    const updatedCoupons = coupons.map(coupon => ({
-      ...coupon,
-      ratio: calculateCouponRatio(Number(coupon.threshold))
-    }));
-    setCoupons(updatedCoupons);
-  }, [calculateCouponRatio, coupons]);
+  const calculateAveragePrice = useCallback(() => {
+    const finalPrice = calculateFinalPrice();
+    return Number(quantity) > 0 ? finalPrice / Number(quantity) : 0;
+  }, [quantity, calculateFinalPrice]);
 
-  useEffect(() => {
-    updateAllCouponRatios();
-  }, [updateAllCouponRatios]);
-
-  const handleDiscountChange = (checked) => {
-    setDiscountEnabled(checked);
-    if (checked) {
-      setReductionEnabled(false);
-    }
-  };
-
-  const handleReductionChange = (checked) => {
-    setReductionEnabled(checked);
-    if (checked) {
-      setDiscountEnabled(false);
-    }
-  };
-
-  const calculateTotalOriginalPrice = useCallback(() => {
-    const price = Number(originalPrice) || 0;
-    const qty = Number(quantity) || 0;
-    return parseFloat((price * qty).toFixed(4));
-  }, [originalPrice, quantity]);
-
-  const calculatePlusDiscount = useCallback((totalOrigPrice) => {
-    if (!isPlusMember) return 0;
-    return parseFloat((totalOrigPrice * 0.05).toFixed(4));
-  }, [isPlusMember]);
-
-  const calculateQuantityDiscount = useCallback((totalOrigPrice) => {
-    if (!discountEnabled) return 0;
-    const qty = Number(quantity) || 0;
-    const discountQty = Number(discountRule.quantity) || 0;
-    const discount = Number(discountRule.discount) || 0;
-    
-    if (qty >= discountQty) {
-      return parseFloat((totalOrigPrice * 0.2).toFixed(4));
-    }
-    return 0;
-  }, [discountEnabled, quantity, discountRule]);
-
-  const calculateReductionDiscount = useCallback((totalOrigPrice) => {
-    if (!reductionEnabled) return 0;
-    const qty = Number(quantity) || 0;
-    const reductionQty = Number(reductionRule.quantity) || 0;
-    const reduction = Number(reductionRule.reduction) || 0;
-    
-    if (qty >= reductionQty) {
-      return parseFloat(reduction.toFixed(4));
-    }
-    return 0;
-  }, [reductionEnabled, quantity, reductionRule]);
-
-  const calculateCouponDiscount = useCallback((totalOrigPrice) => {
-    return parseFloat(coupons.reduce((sum, coupon) => {
-      const threshold = Number(coupon.threshold) || 0;
-      const discount = Number(coupon.discount) || 0;
-      const ratio = Number(coupon.ratio) || 0;
-      if (threshold === 0) return sum;
-      
-      return sum + parseFloat((discount * ratio).toFixed(4));
-    }, 0).toFixed(4));
+  const calculateTotalPrice = useCallback((price) => {
+    return coupons.reduce((total, coupon) => {
+      if (coupon.type === '满减' && price >= Number(coupon.condition)) {
+        return total - Number(coupon.amount);
+      } else if (coupon.type === '满折' && price >= Number(coupon.condition)) {
+        return total * (1 - Number(coupon.amount) / 100);
+      }
+      return total;
+    }, price);
   }, [coupons]);
 
-  const calculateTotal = useCallback(() => {
-    const totalOrigPrice = calculateTotalOriginalPrice();
-    const qty = Number(quantity) || 0;
-
-    const plusDiscountAmount = calculatePlusDiscount(totalOrigPrice);
-    const quantityDiscountAmount = calculateQuantityDiscount(totalOrigPrice);
-    const reductionDiscountAmount = calculateReductionDiscount(totalOrigPrice);
-    const couponDiscountAmount = calculateCouponDiscount(totalOrigPrice);
-
-    const finalPrice = parseFloat((totalOrigPrice - plusDiscountAmount - quantityDiscountAmount - reductionDiscountAmount - couponDiscountAmount).toFixed(4));
-    const unitPrice = qty > 0 ? parseFloat((finalPrice / qty).toFixed(4)) : 0;
-
-    return {
-      totalOriginalPrice: totalOrigPrice.toFixed(2),
-      plusDiscountAmount: plusDiscountAmount.toFixed(2),
-      quantityDiscountAmount: quantityDiscountAmount.toFixed(2),
-      reductionDiscountAmount: reductionDiscountAmount.toFixed(2),
-      couponDiscountAmount: couponDiscountAmount.toFixed(2),
-      finalPrice: finalPrice.toFixed(2),
-      unitPrice: unitPrice.toFixed(2)
-    };
-  }, [calculateTotalOriginalPrice, calculatePlusDiscount, calculateQuantityDiscount, calculateReductionDiscount, calculateCouponDiscount, quantity]);
-
-  const addCoupon = useCallback(() => {
-    setCoupons([...coupons, { threshold: '', discount: '', ratio: '0' }]);
+  const handleAddCoupon = useCallback(() => {
+    setCoupons([...coupons, { type: '满减', condition: '', amount: '' }]);
   }, [coupons]);
 
-  const removeCoupon = useCallback((index) => {
-    setCoupons(coupons.filter((_, i) => i !== index));
-  }, [coupons]);
-
-  const updateCoupon = useCallback((index, field, value) => {
+  const handleCouponChange = useCallback((index, field, value) => {
     const newCoupons = [...coupons];
     newCoupons[index] = { ...newCoupons[index], [field]: value };
-    
-    if (field === 'threshold') {
-      newCoupons[index].ratio = calculateCouponRatio(Number(value));
-    }
-    
     setCoupons(newCoupons);
-  }, [calculateCouponRatio, coupons]);
-
-  const { 
-    totalOriginalPrice, 
-    plusDiscountAmount,
-    quantityDiscountAmount,
-    reductionDiscountAmount,
-    couponDiscountAmount,
-    finalPrice,
-    unitPrice 
-  } = calculateTotal();
+  }, [coupons]);
 
   return (
     <Card className="w-full max-w-sm mx-auto">
@@ -168,155 +58,86 @@ export const CouponCalculator = () => {
         </h1>
 
         <div className="space-y-4">
-          <div className="flex flex-col space-y-1">
-            <label className="text-sm font-medium">商品原价:</label>
-            <Input
-              type="text"
-              value={originalPrice}
-              onChange={(e) => setOriginalPrice(e.target.value)}
-              className="w-full"
-              placeholder="输入商品原价"
-            />
-          </div>
-
-          <div className="flex flex-col space-y-1">
-            <label className="text-sm font-medium">数量:</label>
-            <Input
-              type="text"
-              value={quantity}
-              onChange={(e) => setQuantity(e.target.value)}
-              className="w-full"
-              placeholder="输入商品数量"
-            />
-          </div>
-
-          <div className="flex items-center justify-between">
-            <label className="text-sm font-medium">Plus会员95折:</label>
-            <Checkbox
-              checked={isPlusMember}
-              onCheckedChange={setIsPlusMember}
-            />
-          </div>
-
-          <div className="space-y-3">
-            <label className="text-sm font-medium">折扣:</label>
-            <div className="flex flex-col space-y-2">
-              <div className="flex items-center space-x-2">
-                <div className="flex-1 grid grid-cols-2 gap-2">
-                  <Input
-                    type="text"
-                    value={discountRule.quantity}
-                    onChange={(e) => setDiscountRule(prev => ({ ...prev, quantity: e.target.value }))}
-                    placeholder="件数"
-                    disabled={!discountEnabled}
-                    className="text-sm"
-                  />
-                  <Input
-                    type="text"
-                    value={discountRule.discount}
-                    onChange={(e) => setDiscountRule(prev => ({ ...prev, discount: e.target.value }))}
-                    placeholder="折扣"
-                    disabled={!discountEnabled}
-                    className="text-sm"
-                  />
-                </div>
-                <Checkbox
-                  checked={discountEnabled}
-                  onCheckedChange={handleDiscountChange}
-                />
-              </div>
-
-              <div className="flex items-center space-x-2">
-                <div className="flex-1 grid grid-cols-2 gap-2">
-                  <Input
-                    type="text"
-                    value={reductionRule.quantity}
-                    onChange={(e) => setReductionRule(prev => ({ ...prev, quantity: e.target.value }))}
-                    placeholder="件数"
-                    disabled={!reductionEnabled}
-                    className="text-sm"
-                  />
-                  <Input
-                    type="text"
-                    value={reductionRule.reduction}
-                    onChange={(e) => setReductionRule(prev => ({ ...prev, reduction: e.target.value }))}
-                    placeholder="减额"
-                    disabled={!reductionEnabled}
-                    className="text-sm"
-                  />
-                </div>
-                <Checkbox
-                  checked={reductionEnabled}
-                  onCheckedChange={handleReductionChange}
-                />
-              </div>
+          <div className="grid grid-cols-2 gap-4">
+            <div>
+              <label className="block text-sm font-medium mb-1">商品原价</label>
+              <Input
+                type="number"
+                value={originalPrice}
+                onChange={(e) => setOriginalPrice(e.target.value)}
+                className="w-full"
+              />
+            </div>
+            <div>
+              <label className="block text-sm font-medium mb-1">商品数量</label>
+              <Input
+                type="number"
+                value={quantity}
+                onChange={(e) => setQuantity(e.target.value)}
+                className="w-full"
+              />
             </div>
           </div>
 
-          <div className="space-y-2">
-            <label className="text-sm font-medium">优惠券:</label>
+          <div className="flex items-center space-x-2">
+            <Checkbox
+              checked={isPlusMember}
+              onCheckedChange={(checked) => setIsPlusMember(!!checked)}
+            />
+            <label className="text-sm font-medium">Plus会员(95折)</label>
+          </div>
+
+          <div className="space-y-4">
             {coupons.map((coupon, index) => (
-              <div key={index} className="flex items-center space-x-2">
-                <div className="grid grid-cols-3 gap-1 flex-1">
-                  <Input
-                    type="text"
-                    value={coupon.threshold}
-                    onChange={(e) => updateCoupon(index, 'threshold', e.target.value)}
-                    placeholder="满额"
-                    className="text-sm"
-                  />
-                  <Input
-                    type="text"
-                    value={coupon.discount}
-                    onChange={(e) => updateCoupon(index, 'discount', e.target.value)}
-                    placeholder="优惠"
-                    className="text-sm"
-                  />
-                  <Input
-                    type="text"
-                    value={coupon.ratio}
-                    placeholder="比例"
-                    readOnly
-                    className="text-sm bg-gray-50"
-                  />
+              <Card key={index} className="p-4">
+                <div className="grid grid-cols-3 gap-4">
+                  <div>
+                    <label className="block text-sm font-medium mb-1">优惠类型</label>
+                    <select
+                      value={coupon.type}
+                      onChange={(e) =>
+                        handleCouponChange(index, "type", e.target.value)
+                      }
+                      className="w-full p-2 border rounded"
+                    >
+                      <option value="满减">满减</option>
+                      <option value="满折">满折</option>
+                    </select>
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium mb-1">条件</label>
+                    <Input
+                      type="number"
+                      value={coupon.condition}
+                      onChange={(e) =>
+                        handleCouponChange(index, "condition", Number(e.target.value))
+                      }
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium mb-1">
+                      {coupon.type === "满减" ? "优惠金额" : "折扣比例"}
+                    </label>
+                    <Input
+                      type="number"
+                      value={coupon.amount}
+                      onChange={(e) =>
+                        handleCouponChange(index, "amount", Number(e.target.value))
+                      }
+                    />
+                  </div>
                 </div>
-                <Button 
-                  onClick={() => removeCoupon(index)}
-                  variant="destructive"
-                  className="h-8 w-8 p-0"
-                >
-                  ×
-                </Button>
-              </div>
+              </Card>
             ))}
           </div>
 
-          <Button 
-            className="w-full bg-[#0F172A] hover:bg-[#1E293B] text-white" 
-            onClick={addCoupon}
-          >
+          <Button onClick={handleAddCoupon} className="w-full bg-[#0F172A] hover:bg-[#1E293B] text-white">
             添加优惠券
           </Button>
 
-          <div className="mt-6 p-3 bg-gray-50 rounded-lg space-y-2 text-sm">
-            <div>原价: ¥{originalPrice || '0'}</div>
-            <div>{quantity || '0'}件共: ¥{totalOriginalPrice}</div>
-            {isPlusMember && Number(plusDiscountAmount) > 0 && (
-              <div>Plus优惠: -¥{plusDiscountAmount}</div>
-            )}
-            {discountEnabled && Number(quantityDiscountAmount) > 0 && (
-              <div>折扣优惠: -¥{quantityDiscountAmount}</div>
-            )}
-            {reductionEnabled && Number(reductionDiscountAmount) > 0 && (
-              <div>满减优惠: -¥{reductionDiscountAmount}</div>
-            )}
-            {Number(couponDiscountAmount) > 0 && (
-              <div>优惠券优惠: -¥{couponDiscountAmount}</div>
-            )}
-            <div className="pt-2 border-t border-gray-200 font-medium">
-              <div>最终价格: ¥{finalPrice}</div>
-              <div>单均价: ¥{unitPrice}</div>
-            </div>
+          <div className="mt-4 p-4 bg-gray-50 rounded-lg">
+            <p className="text-lg font-semibold">最终价格: ¥{calculateFinalPrice().toFixed(2)}</p>
+            <p className="text-sm text-gray-600">单均价: ¥{calculateAveragePrice().toFixed(2)}</p>
           </div>
         </div>
       </CardContent>
