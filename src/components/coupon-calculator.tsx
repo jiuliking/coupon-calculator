@@ -1,12 +1,12 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Checkbox } from '@/components/ui/checkbox';
 
-const CouponCalculator = () => {
+export const CouponCalculator = () => {
   const [originalPrice, setOriginalPrice] = useState('');
   const [quantity, setQuantity] = useState('');
   const [isPlusMember, setIsPlusMember] = useState(false);
@@ -25,7 +25,7 @@ const CouponCalculator = () => {
     { threshold: '', discount: '', ratio: '0' }
   ]);
 
-  const calculateCouponRatio = (threshold) => {
+  const calculateCouponRatio = useCallback((threshold) => {
     const totalPrice = calculateTotalOriginalPrice();
     if (!threshold || threshold <= 0) return '0';
     
@@ -34,15 +34,15 @@ const CouponCalculator = () => {
     } else {
       return (totalPrice / threshold).toFixed(4);
     }
-  };
+  }, [calculateTotalOriginalPrice]);
 
-  const updateAllCouponRatios = () => {
+  const updateAllCouponRatios = useCallback(() => {
     const updatedCoupons = coupons.map(coupon => ({
       ...coupon,
       ratio: calculateCouponRatio(Number(coupon.threshold))
     }));
     setCoupons(updatedCoupons);
-  };
+  }, [calculateCouponRatio, coupons]);
 
   useEffect(() => {
     updateAllCouponRatios();
@@ -62,18 +62,18 @@ const CouponCalculator = () => {
     }
   };
 
-  const calculateTotalOriginalPrice = () => {
+  const calculateTotalOriginalPrice = useCallback(() => {
     const price = Number(originalPrice) || 0;
     const qty = Number(quantity) || 0;
     return parseFloat((price * qty).toFixed(4));
-  };
+  }, [originalPrice, quantity]);
 
-  const calculatePlusDiscount = (totalOrigPrice) => {
+  const calculatePlusDiscount = useCallback((totalOrigPrice) => {
     if (!isPlusMember) return 0;
     return parseFloat((totalOrigPrice * 0.05).toFixed(4));
-  };
+  }, [isPlusMember]);
 
-  const calculateQuantityDiscount = (totalOrigPrice) => {
+  const calculateQuantityDiscount = useCallback((totalOrigPrice) => {
     if (!discountEnabled) return 0;
     const qty = Number(quantity) || 0;
     const discountQty = Number(discountRule.quantity) || 0;
@@ -83,9 +83,9 @@ const CouponCalculator = () => {
       return parseFloat((totalOrigPrice * 0.2).toFixed(4));
     }
     return 0;
-  };
+  }, [discountEnabled, quantity, discountRule]);
 
-  const calculateReductionDiscount = (totalOrigPrice) => {
+  const calculateReductionDiscount = useCallback((totalOrigPrice) => {
     if (!reductionEnabled) return 0;
     const qty = Number(quantity) || 0;
     const reductionQty = Number(reductionRule.quantity) || 0;
@@ -95,9 +95,9 @@ const CouponCalculator = () => {
       return parseFloat(reduction.toFixed(4));
     }
     return 0;
-  };
+  }, [reductionEnabled, quantity, reductionRule]);
 
-  const calculateCouponDiscount = (totalOrigPrice) => {
+  const calculateCouponDiscount = useCallback((totalOrigPrice) => {
     return parseFloat(coupons.reduce((sum, coupon) => {
       const threshold = Number(coupon.threshold) || 0;
       const discount = Number(coupon.discount) || 0;
@@ -106,9 +106,9 @@ const CouponCalculator = () => {
       
       return sum + parseFloat((discount * ratio).toFixed(4));
     }, 0).toFixed(4));
-  };
+  }, [coupons]);
 
-  const calculateTotal = () => {
+  const calculateTotal = useCallback(() => {
     const totalOrigPrice = calculateTotalOriginalPrice();
     const qty = Number(quantity) || 0;
 
@@ -129,17 +129,17 @@ const CouponCalculator = () => {
       finalPrice: finalPrice.toFixed(2),
       unitPrice: unitPrice.toFixed(2)
     };
-  };
+  }, [calculateTotalOriginalPrice, calculatePlusDiscount, calculateQuantityDiscount, calculateReductionDiscount, calculateCouponDiscount, quantity]);
 
-  const addCoupon = () => {
+  const addCoupon = useCallback(() => {
     setCoupons([...coupons, { threshold: '', discount: '', ratio: '0' }]);
-  };
+  }, [coupons]);
 
-  const removeCoupon = (index) => {
+  const removeCoupon = useCallback((index) => {
     setCoupons(coupons.filter((_, i) => i !== index));
-  };
+  }, [coupons]);
 
-  const updateCoupon = (index, field, value) => {
+  const updateCoupon = useCallback((index, field, value) => {
     const newCoupons = [...coupons];
     newCoupons[index] = { ...newCoupons[index], [field]: value };
     
@@ -148,7 +148,7 @@ const CouponCalculator = () => {
     }
     
     setCoupons(newCoupons);
-  };
+  }, [calculateCouponRatio, coupons]);
 
   const { 
     totalOriginalPrice, 
@@ -323,5 +323,3 @@ const CouponCalculator = () => {
     </Card>
   );
 };
-
-export default CouponCalculator;
