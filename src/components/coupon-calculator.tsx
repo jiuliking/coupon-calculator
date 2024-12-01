@@ -1,54 +1,79 @@
 'use client';
 
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useCallback } from 'react';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Checkbox } from '@/components/ui/checkbox';
 
+interface Coupon {
+  type: '满减' | '满折';
+  condition: number;
+  amount: number;
+  ratio?: number;
+}
+
 export const CouponCalculator = () => {
-  const [originalPrice, setOriginalPrice] = useState('');
-  const [quantity, setQuantity] = useState('');
+  const [originalPrice, setOriginalPrice] = useState(0);
+  const [quantity, setQuantity] = useState(1);
   const [isPlusMember, setIsPlusMember] = useState(false);
-  const [coupons, setCoupons] = useState([
-    { type: '满减', condition: '', amount: '' },
-    { type: '满减', condition: '', amount: '' }
-  ]);
+  const [coupons, setCoupons] = useState<Coupon[]>([]);
+
+  const calculateRatio = useCallback((coupon: Coupon) => {
+    if (coupon.condition <= 0) return 0;
+    return coupon.amount / coupon.condition;
+  }, []);
+
+  const calculateTotalPrice = useCallback((coupons: Coupon[]) => {
+    let finalPrice = originalPrice;
+    // 根据优惠券比例排序
+    const sortedCoupons = [...coupons].sort((a, b) => (b.ratio || 0) - (a.ratio || 0));
+
+    for (const coupon of sortedCoupons) {
+      if (finalPrice >= (coupon.condition || 0)) {
+        finalPrice -= coupon.amount || 0;
+      }
+    }
+
+    return Math.max(0, finalPrice);
+  }, [originalPrice]);
+
+  const handleCouponChange = useCallback(
+    (index: number, field: keyof Coupon, value: string | number) => {
+      const newCoupons = [...coupons];
+      newCoupons[index] = {
+        ...newCoupons[index],
+        [field]: value,
+        ratio: calculateRatio(newCoupons[index]),
+      };
+      setCoupons(newCoupons);
+    },
+    [coupons, calculateRatio]
+  );
+
+  const handleAddCoupon = useCallback(() => {
+    const newCoupon = {
+      type: '满减' as const,
+      condition: 0,
+      amount: 0,
+      ratio: 0,
+    };
+    setCoupons([...coupons, newCoupon]);
+  }, [coupons]);
 
   const calculateFinalPrice = useCallback(() => {
-    let finalPrice = Number(originalPrice) || 0;
+    let finalPrice = originalPrice;
     if (isPlusMember) {
       finalPrice *= 0.95; // Plus会员95折
     }
-    finalPrice = calculateTotalPrice(finalPrice);
+    finalPrice = calculateTotalPrice(coupons);
     return finalPrice;
-  }, [originalPrice, isPlusMember, coupons]);
+  }, [originalPrice, isPlusMember, coupons, calculateTotalPrice]);
 
   const calculateAveragePrice = useCallback(() => {
     const finalPrice = calculateFinalPrice();
-    return Number(quantity) > 0 ? finalPrice / Number(quantity) : 0;
+    return quantity > 0 ? finalPrice / quantity : 0;
   }, [quantity, calculateFinalPrice]);
-
-  const calculateTotalPrice = useCallback((price) => {
-    return coupons.reduce((total, coupon) => {
-      if (coupon.type === '满减' && price >= Number(coupon.condition)) {
-        return total - Number(coupon.amount);
-      } else if (coupon.type === '满折' && price >= Number(coupon.condition)) {
-        return total * (1 - Number(coupon.amount) / 100);
-      }
-      return total;
-    }, price);
-  }, [coupons]);
-
-  const handleAddCoupon = useCallback(() => {
-    setCoupons([...coupons, { type: '满减', condition: '', amount: '' }]);
-  }, [coupons]);
-
-  const handleCouponChange = useCallback((index, field, value) => {
-    const newCoupons = [...coupons];
-    newCoupons[index] = { ...newCoupons[index], [field]: value };
-    setCoupons(newCoupons);
-  }, [coupons]);
 
   return (
     <Card className="w-full max-w-sm mx-auto">
@@ -63,8 +88,8 @@ export const CouponCalculator = () => {
               <label className="block text-sm font-medium mb-1">商品原价</label>
               <Input
                 type="number"
-                value={originalPrice}
-                onChange={(e) => setOriginalPrice(e.target.value)}
+                value={originalPrice || ''}
+                onChange={(e) => setOriginalPrice(Number(e.target.value))}
                 className="w-full"
               />
             </div>
@@ -72,8 +97,8 @@ export const CouponCalculator = () => {
               <label className="block text-sm font-medium mb-1">商品数量</label>
               <Input
                 type="number"
-                value={quantity}
-                onChange={(e) => setQuantity(e.target.value)}
+                value={quantity || ''}
+                onChange={(e) => setQuantity(Number(e.target.value))}
                 className="w-full"
               />
             </div>
@@ -96,7 +121,7 @@ export const CouponCalculator = () => {
                     <select
                       value={coupon.type}
                       onChange={(e) =>
-                        handleCouponChange(index, "type", e.target.value)
+                        handleCouponChange(index, 'type', e.target.value as '满减' | '满折')
                       }
                       className="w-full p-2 border rounded"
                     >
@@ -108,21 +133,21 @@ export const CouponCalculator = () => {
                     <label className="block text-sm font-medium mb-1">条件</label>
                     <Input
                       type="number"
-                      value={coupon.condition}
+                      value={coupon.condition || ''}
                       onChange={(e) =>
-                        handleCouponChange(index, "condition", Number(e.target.value))
+                        handleCouponChange(index, 'condition', Number(e.target.value))
                       }
                     />
                   </div>
                   <div>
                     <label className="block text-sm font-medium mb-1">
-                      {coupon.type === "满减" ? "优惠金额" : "折扣比例"}
+                      {coupon.type === '满减' ? '优惠金额' : '折扣比例'}
                     </label>
                     <Input
                       type="number"
-                      value={coupon.amount}
+                      value={coupon.amount || ''}
                       onChange={(e) =>
-                        handleCouponChange(index, "amount", Number(e.target.value))
+                        handleCouponChange(index, 'amount', Number(e.target.value))
                       }
                     />
                   </div>
