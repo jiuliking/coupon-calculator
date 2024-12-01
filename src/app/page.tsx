@@ -1,5 +1,4 @@
-import Image from "next/image";
-import CouponCalculator from "@/components/coupon-calculator";
+import { CouponCalculator } from "@/components/coupon-calculator";
 
 export default function Home() {
   return (

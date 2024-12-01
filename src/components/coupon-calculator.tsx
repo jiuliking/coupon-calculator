@@ -46,7 +46,7 @@ const CouponCalculator = () => {
 
   useEffect(() => {
     updateAllCouponRatios();
-  }, [originalPrice, quantity]);
+  }, [updateAllCouponRatios]);
 
   const handleDiscountChange = (checked) => {
     setDiscountEnabled(checked);
